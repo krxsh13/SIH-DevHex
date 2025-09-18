@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alumni Management - Frontend Demo</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-gray-100">
+    <div class="container mx-auto px-4 py-8">
+        <div class="max-w-4xl mx-auto">
+            <h1 class="text-3xl font-bold text-center mb-8">Alumni Management System</h1>
+            <p class="text-center text-gray-600 mb-8">Frontend Demo - Connected to Backend API</p>
+
+            <!-- API Status -->
+            <div id="api-status" class="mb-8 p-4 rounded-lg">
+                <h3 class="font-bold mb-2">API Connection Status:</h3>
+                <p id="status-text">Checking connection...</p>
+            </div>
+
+            <!-- Tabs -->
+            <div class="mb-6">
+                <div class="flex border-b">
+                    <button onclick="showTab('register')" id="register-tab"
+                        class="px-4 py-2 font-medium text-blue-600 border-b-2 border-blue-600">Register</button>
+                    <button onclick="showTab('login')" id="login-tab"
+                        class="px-4 py-2 font-medium text-gray-500 hover:text-blue-600">Login</button>
+                    <button onclick="showTab('profile')" id="profile-tab"
+                        class="px-4 py-2 font-medium text-gray-500 hover:text-blue-600">Profile</button>
+                </div>
+            </div>
+
+            <!-- Register Form -->
+            <div id="register-form" class="bg-white p-6 rounded-lg shadow-md">
+                <h2 class="text-2xl font-bold mb-6">Register New User</h2>
+                <form id="registration-form">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label class="block text-gray-700 text-sm font-bold mb-2">First Name *</label>
+                            <input type="text" id="reg-firstName" required
+                                class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-gray-700 text-sm font-bold mb-2">Last Name *</label>
+                            <input type="text" id="reg-lastName" required
+                                class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500">
+                        </div>
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-gray-700 text-sm font-bold mb-2">Email *</label>
+                        <input type="email" id="reg-email" required
+                            class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500">
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-gray-700 text-sm font-bold mb-2">Password *</label>
+                        <input type="password" id="reg-password" required
+                            class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500">
+                        <p class="text-sm text-gray-500 mt-1">Minimum 6 characters</p>
+                    </div>
+                    <div class="mb-6">
+                        <label class="block text-gray-700 text-sm font-bold mb-2">Phone</label>
+                        <input type="tel" id="reg-phone"
+                            class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500">
+                    </div>
+                    <button type="submit" id="register-btn"
+                        class="w-full bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">
+                        Register
+                    </button>
+                </form>
+            </div>
+
+            <!-- Login Form -->
+            <div id="login-form" class="bg-white p-6 rounded-lg shadow-md hidden">
+                <h2 class="text-2xl font-bold mb-6">Login</h2>
+                <form id="login-form-element">
+                    <div class="mb-4">
+                        <label class="block text-gray-700 text-sm font-bold mb-2">Email</label>
+                        <input type="email" id="login-email" required
+                            class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500">
+                    </div>
+                    <div class="mb-6">
+                        <label class="block text-gray-700 text-sm font-bold mb-2">Password</label>
+                        <input type="password" id="login-password" required
+                            class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500">
+                    </div>
+                    <button type="submit" id="login-btn"
+                        class="w-full bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg">
+                        Login
+                    </button>
+                </form>
+            </div>
+
+            <!-- Profile Form -->
+            <div id="profile-form" class="bg-white p-6 rounded-lg shadow-md hidden">
+                <h2 class="text-2xl font-bold mb-6">User Profile</h2>
+                <div id="profile-content">
+                    <p class="text-gray-500">Please login to view and edit your profile.</p>
+                </div>
+            </div>
+
+            <!-- Messages -->
+            <div id="messages" class="mt-6"></div>
+
+            <!-- API Response Display -->
+            <div id="api-response" class="mt-6 bg-gray-800 text-green-400 p-4 rounded-lg font-mono text-sm hidden">
+                <h3 class="text-white font-bold mb-2">API Response:</h3>
+                <pre id="response-content"></pre>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:5000/api';
+        let currentUser = null;
+        let authToken = localStorage.getItem('authToken');
+
+        // Check API connection on load
+        window.addEventListener('load', checkApiConnection);
+
+        async function checkApiConnection() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/health`);
+                const data = await response.json();
+
+                if (data.success) {
+                    showStatus('✅ Connected to Backend API', 'bg-green-100 text-green-800');
+
+                    // If user has token, load profile
+                    if (authToken) {
+                        await loadUserProfile();
+                    }
+                } else {
+                    showStatus('❌ API Error: ' + data.message, 'bg-red-100 text-red-800');
+                }
+            } catch (error) {
+                showStatus('❌ Cannot connect to Backend API. Make sure server is running on port 5000.', 'bg-red-100 text-red-800');
+            }
+        }
+
+        function showStatus(message, className) {
+            const statusDiv = document.getElementById('api-status');
+            const statusText = document.getElementById('status-text');
+            statusDiv.className = `mb-8 p-4 rounded-lg ${className}`;
+            statusText.textContent = message;
+        }
+
+        function showTab(tabName) {
+            // Hide all forms
+            document.getElementById('register-form').classList.add('hidden');
+            document.getElementById('login-form').classList.add('hidden');
+            document.getElementById('profile-form').classList.add('hidden');
+
+            // Reset tab styles
+            document.querySelectorAll('[id$="-tab"]').forEach(tab => {
+                tab.className = 'px-4 py-2 font-medium text-gray-500 hover:text-blue-600';
+            });
+
+            // Show selected form and highlight tab
+            document.getElementById(`${tabName}-form`).classList.remove('hidden');
+            document.getElementById(`${tabName}-tab`).className = 'px-4 py-2 font-medium text-blue-600 border-b-2 border-blue-600';
+        }
+
+        function showMessage(message, type = 'info') {
+            const messagesDiv = document.getElementById('messages');
+            const className = type === 'error' ? 'bg-red-100 border-red-400 text-red-700' :
+                type === 'success' ? 'bg-green-100 border-green-400 text-green-700' :
+                    'bg-blue-100 border-blue-400 text-blue-700';
+
+            messagesDiv.innerHTML = `
+                <div class="border px-4 py-3 rounded ${className}">
+                    ${message}
+                </div>
+            `;
+
+            // Auto-hide after 5 seconds
+            setTimeout(() => {
+                messagesDiv.innerHTML = '';
+            }, 5000);
+        }
+
+        function showApiResponse(data) {
+            const responseDiv = document.getElementById('api-response');
+            const responseContent = document.getElementById('response-content');
+            responseContent.textContent = JSON.stringify(data, null, 2);
+            responseDiv.classList.remove('hidden');
+
+            // Auto-hide after 10 seconds
+            setTimeout(() => {
+                responseDiv.classList.add('hidden');
+            }, 10000);
+        }
+
+        // Registration Form Handler
+        document.getElementById('registration-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const formData = {
+                email: document.getElementById('reg-email').value,
+                password: document.getElementById('reg-password').value,
+                firstName: document.getElementById('reg-firstName').value,
+                lastName: document.getElementById('reg-lastName').value,
+                phone: document.getElementById('reg-phone').value,
+            };
+
+            const registerBtn = document.getElementById('register-btn');
+            registerBtn.textContent = 'Registering...';
+            registerBtn.disabled = true;
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/auth/register`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(formData),
+                });
+
+                const data = await response.json();
+                showApiResponse(data);
+
+                if (data.success) {
+                    showMessage('✅ Registration successful! You can now login.', 'success');
+
+                    // Store token and user data
+                    authToken = data.data.token;
+                    localStorage.setItem('authToken', authToken);
+                    currentUser = data.data.user;
+
+                    // Clear form
+                    document.getElementById('registration-form').reset();
+
+                    // Switch to profile tab
+                    showTab('profile');
+                    displayUserProfile(currentUser);
+                } else {
+                    showMessage('❌ Registration failed: ' + data.error.message, 'error');
+                }
+            } catch (error) {
+                showMessage('❌ Registration failed: ' + error.message, 'error');
+            } finally {
+                registerBtn.textContent = 'Register';
+                registerBtn.disabled = false;
+            }
+        });
+
+        // Login Form Handler
+        document.getElementById('login-form-element').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const credentials = {
+                email: document.getElementById('login-email').value,
+                password: document.getElementById('login-password').value,
+            };
+
+            const loginBtn = document.getElementById('login-btn');
+            loginBtn.textContent = 'Logging in...';
+            loginBtn.disabled = true;
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(credentials),
+                });
+
+                const data = await response.json();
+                showApiResponse(data);
+
+                if (data.success) {
+                    showMessage('✅ Login successful!', 'success');
+
+                    // Store token and user data
+                    authToken = data.data.token;
+                    localStorage.setItem('authToken', authToken);
+                    currentUser = data.data.user;
+
+                    // Clear form
+                    document.getElementById('login-form-element').reset();
+
+                    // Switch to profile tab
+                    showTab('profile');
+                    displayUserProfile(currentUser);
+                } else {
+                    showMessage('❌ Login failed: ' + data.error.message, 'error');
+                }
+            } catch (error) {
+                showMessage('❌ Login failed: ' + error.message, 'error');
+            } finally {
+                loginBtn.textContent = 'Login';
+                loginBtn.disabled = false;
+            }
+        });
+
+        async function loadUserProfile() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/auth/profile`, {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                    },
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    currentUser = data.data.user;
+                    displayUserProfile(currentUser);
+                } else {
+                    // Token might be expired
+                    localStorage.removeItem('authToken');
+                    authToken = null;
+                }
+            } catch (error) {
+                console.error('Failed to load profile:', error);
+            }
+        }
+
+        function displayUserProfile(user) {
+            const profileContent = document.getElementById('profile-content');
+            profileContent.innerHTML = `
+                <div class="space-y-4">
+                    <div class="flex justify-between items-center">
+                        <h3 class="text-lg font-semibold">Welcome, ${user.firstName} ${user.lastName}!</h3>
+                        <button onclick="logout()" class="bg-red-500 hover:bg-red-700 text-white px-4 py-2 rounded">
+                            Logout
+                        </button>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Email</label>
+                            <p class="mt-1 text-sm text-gray-900">${user.email}</p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Role</label>
+                            <p class="mt-1 text-sm text-gray-900">${user.role}</p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Phone</label>
+                            <p class="mt-1 text-sm text-gray-900">${user.phone || 'Not provided'}</p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Member Since</label>
+                            <p class="mt-1 text-sm text-gray-900">${new Date(user.createdAt).toLocaleDateString()}</p>
+                        </div>
+                    </div>
+
+                    ${user.profile ? `
+                        <div class="mt-6">
+                            <h4 class="text-md font-semibold mb-3">Profile Information</h4>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                ${user.profile.bio ? `
+                                    <div class="md:col-span-2">
+                                        <label class="block text-sm font-medium text-gray-700">Bio</label>
+                                        <p class="mt-1 text-sm text-gray-900">${user.profile.bio}</p>
+                                    </div>
+                                ` : ''}
+                                ${user.profile.graduationYear ? `
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700">Graduation Year</label>
+                                        <p class="mt-1 text-sm text-gray-900">${user.profile.graduationYear}</p>
+                                    </div>
+                                ` : ''}
+                                ${user.profile.degree ? `
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700">Degree</label>
+                                        <p class="mt-1 text-sm text-gray-900">${user.profile.degree}</p>
+                                    </div>
+                                ` : ''}
+                            </div>
+                        </div>
+                    ` : ''}
+
+                    <div class="mt-6 p-4 bg-gray-50 rounded-lg">
+                        <h4 class="font-semibold mb-2">✅ Data Successfully Saved to Database!</h4>
+                        <p class="text-sm text-gray-600">
+                            All the information above was submitted through this frontend form and 
+                            is now permanently stored in the MongoDB database via the backend API.
+                        </p>
+                    </div>
+                </div>
+            `;
+        }
+
+        function logout() {
+            localStorage.removeItem('authToken');
+            authToken = null;
+            currentUser = null;
+
+            showMessage('✅ Logged out successfully', 'success');
+            showTab('login');
+
+            // Reset profile content
+            document.getElementById('profile-content').innerHTML =
+                '<p class="text-gray-500">Please login to view and edit your profile.</p>';
+        }
+    </script>
+</body>
+
+</html>
